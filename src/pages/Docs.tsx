@@ -29,6 +29,7 @@ const Docs: Component = (props) => {
   const [section, setSection] = createStore<Record<string, boolean>>({});
   const [toggleSections, setToggleSections] = createSignal(false);
   const [observeInteraction] = createViewportObserver([], 0.5);
+
   // Determine the section based on title positions
   const [determineSection] = createThrottle((entry: IntersectionObserverEntry) => {
     if (entry.intersectionRatio == 0) {
@@ -44,7 +45,9 @@ const Docs: Component = (props) => {
     }
     setCurrent(prev.slug);
   }, 75);
+
   let menuButton!: HTMLButtonElement;
+
   // Upon loading finish bind observers
   createEffect(() => {
     if (!data.loading) {
@@ -58,6 +61,84 @@ const Docs: Component = (props) => {
       }
     }
   });
+
+  type DragDetails = {
+    /** The amount dragged along X in total. */
+    totalX: number;
+    /** The amount dragged along Y in total. */
+    totalY: number;
+
+    /** The amount dragged along X since the last event. */
+    deltaX: number;
+    /** The amount dragged along Y since the last event. */
+    deltaY: number;
+
+    /** 1 means positive direction on X, -1 means negative direction on X. */
+    directionX: number;
+    /** 1 means positive direction on Y, -1 means negative direction on Y. */
+    directionY: number;
+
+    /** The underlying event in case it is needed. */
+    event: PointerEvent;
+  };
+
+  type DragProps = {
+    children: HTMLElement;
+    onDrag: (details: DragDetails) => void;
+  };
+
+  const Drag: Component<DragProps> = (props) => {
+    let [details, setDetails] = createSignal<DragDetails>();
+
+    let el: HTMLElement | null = null;
+
+    let totalX = 0;
+    let totalY = 0;
+    let deltaX = 0;
+    let deltaY = 0;
+    let directionX = 0;
+    let directionY = 0;
+
+    const onDown = (event: PointerEvent) => {
+      const target = event.target as HTMLElement;
+
+      // Prevent the browser from interfering with our drag handling. Weird, I know.
+      target.releasePointerCapture(event.pointerId);
+
+      el!.addEventListener('pointermove', onMove);
+    };
+
+    const onMove = (event: PointerEvent) => {
+      props.onDrag({
+        totalX: 0,
+        totalY: 0,
+
+        deltaX: 0,
+        deltaY: 0,
+
+        directionX: 0,
+        directionY: 0,
+
+        event,
+      });
+    };
+
+    createEffect(() => {
+      if (el) el.removeEventListener('pointermove', onMove);
+      el = props.children;
+
+      // If you want to completely take over an element for drag handling (and
+      // never allow the browser to prevent the drag interaction), always add
+      // this.
+      el.addEventListener('pointercancel', (e) => e.preventDefault());
+
+      el.addEventListener('pointerdown', onDown);
+      el.addEventListener('pointermove', onMove);
+    });
+
+    return <>{props.children}</>;
+  };
+
   return (
     <div class="flex flex-col relative">
       <Nav showLogo />
@@ -81,16 +162,16 @@ const Docs: Component = (props) => {
             show
           >
             <div
-              class={
-                'py-5 h-5/6 w-5/6 rounded-r-lg rounded-br-lg overflow-auto z-20 p-10 shadow-2xl border-2 border-gray-100 dark:bg-solid-gray bg-white fixed top-14 duration-300 transform ' +
-                'max-w-md lg:border-0 lg:shadow-none lg:p-0 lg:flex-col lg:top-12 ' +
-                'lg:sticky lg:flex'
-              }
+              class={`
+                py-5 w-5/6 overflow-auto z-20 p-10 shadow-2xl border-2 border-gray-100 dark:bg-solid-gray bg-white fixed top-14 duration-300 transform
+                max-w-md lg:border-0 lg:shadow-none lg:p-0 lg:flex-col lg:top-12
+                lg:sticky lg:flex
+              `}
               classList={{
                 '-left-full': !toggleSections(),
                 'left-0': toggleSections(),
               }}
-              style={{ height: 'calc(100vh - 5rem)', top: '4rem' }}
+              style={{ height: 'calc(100vh - 4rem)', top: '4rem' }}
             >
               <ul class="overflow-auto mt-5 flex dark:text-white flex-col flex-1">
                 <For each={data.doc.sections}>

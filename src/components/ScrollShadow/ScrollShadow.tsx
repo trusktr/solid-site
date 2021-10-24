@@ -31,6 +31,7 @@ const ScrollShadow: Component<
   let initResetSize = false;
 
   // Won't work for SSR
+  // Will it work if we stick is inside onMount?
   const scrollableContainer = props.children as HTMLElement;
   scrollableContainer.appendChild(sentinelFirstEl);
   scrollableContainer.appendChild(sentinelLastEl);
